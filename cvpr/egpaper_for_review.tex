@@ -1,0 +1,754 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage{cvpr}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+%\usepackage[backend=biber]{biblatex}
+%\usepackage{algpseudocode}
+
+
+% Include other packages here, before hyperref.
+
+% If you comment hyperref and then uncomment it, you should delete
+% egpaper.aux before re-running latex.  (Or just hit 'q' on the first latex
+% run, let it finish, and you should be clear).
+\usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
+
+% \cvprfinalcopy % *** Uncomment this line for the final submission
+
+\def\cvprPaperID{****} % *** Enter the CVPR Paper ID here
+\def\httilde{\mbox{\tt\raisebox{-.5ex}{\symbol{126}}}}
+
+% Pages are numbered in submission mode, and unnumbered in camera-ready
+\ifcvprfinal\pagestyle{empty}\fi
+\begin{document}
+
+%%%%%%%%% TITLE
+\title{\LaTeX\ Author Guidelines for CVPR Proceedings}
+
+\author{First Author\\
+Institution1\\
+Institution1 address\\
+{\tt\small firstauthor@i1.org}
+% For a paper whose authors are all at the same institution,
+% omit the following lines up until the closing ``}''.
+% Additional authors and addresses can be added with ``\and'',
+% just like the second author.
+% To save space, use either the email address or home page, not both
+\and
+Second Author\\
+Institution2\\
+First line of institution2 address\\
+{\tt\small secondauthor@i2.org}
+}
+
+\maketitle
+%\thispagestyle{empty}
+%%%%%%%%% ABSTRACT
+\begin{abstract}	
+The deep convolutional neural network (ConvNet) methods 
+have recently shown promising results for aesthetics assessment. However, the performance of these deep ConvNet 
+methods is often compromised by the constraint that the neural network only takes the fixed-size input. 
+To accommodate this requirement, input images need to be transformed into one patch via cropping, scaling, or padding, 
+which often damages image composition, reduces image resolution, or causes image distortion, thus compromising the aesthetics of the original images.
+To solve these problems, we propose to build a Multi-Patch Layout-Aware Aggregation Convolutional Neural Network (MPLA-CNN),
+which is capable of accepting arbitrary image size and aspect ratio, and preserving fine-grained 
+details from high-resolution images without loosing the local and global layout of images.
+Specifically, an adaptive multi-patch selection scheme is performed to efficiently select multiple patches, which
+represent the most valuable information according to our aesthetic assessment task. Therefore, a novel CNN architecture
+is designed to simultaneously deal with fine-grained details from multiple patches and image local and global layout, which 
+represent image composition as a whole by a multi-patch subnet and a layout-aware subnet.
+Specifically, to combine features from multiple patches and two subnets, a statistic aggregation layer and 
+a learning-based aggregation layer are adopted.
+
+\end{abstract}
+
+%%%%%%%%% BODY TEXT
+\section{Introduction}
+%%%%%%% Potential Application%%%%%%%%%%%%
+Problems of image aesthetics assessment 
+have drawn numerous research attentions with the goal of 
+endow computers with the capability of perceiving aesthetics and
+visual quality as human vision systems. Potential usage
+of methods developed for this task could be foreseen
+towards wide contemporary applications from intelligent computer
+systems to real-time, mobile applications. In an image retrieval 
+system, the ranking algorithm can incorporate aesthetic quality 
+as one of the factors. In picture editing software, aesthetics can be
+used in producing appealing polished photographs.
+
+%%%%%%% previous hand-craf work%%%%%%%%%%%%
+While assessing photo aesthetics is challenging. Existing photo aesthetic
+assessment methods extract visual features and then employ various machine 
+learning algorithms to predict photo aesthetic values. Thus the effectiveness 
+of the image representation, or the extracted features is a critical part 
+for aesthetics assessment. Early methods manually design various hand-craft 
+aesthetics features that are carefully designed to approximate a number of 
+photographic and psychological aesthetics rules, including low-level image 
+statistics such as distribution of edges, color histograms and light contrast, 
+etc. \cite{Luo:2008:ECCV} \cite{Bhattacharya:2010:ACMMM} \cite{Cohen-Or:2006:SIGGRAPH}, 
+as well as some high level features, composition principles, photo content 
+and scene categories, etc.\cite{Tang:2013:TMM} \cite{Sagnik:2011:CVPR}.
+
+Although these handcraft features have shown encouraging 
+results. Manually designing effective aesthetics
+features is still a challenging task because even experienced
+photographers use very abstract terms such as "good composition,
+color, and lighting", to describe high quality photos. 
+
+%%%%% generic feautres 
+Other approaches have been developed to leverage more 
+generic image features to predict photo aesthetics to 
+address the limitations of the handcrafted aesthetic features. 
+They used well-designed common image features such as SIFT, Fisher Vector 
+\cite{Marchesotti:2011:ICCV} \cite{Perronnin:2010:ECCV}  
+and bag of visual words \cite{Su:2011:ACMMM}. Though obtaining
+promising performance, the image representation provided
+by those generic features may not be optimal for the 
+task of photo aesthetics, as they are designed to represent natural images in
+general, not specifically for aesthetics assessment.
+
+%%%%% CNN method %%%%%%%%%%%%%%%
+Motivated by the recent prevalence of deep convolutional neural network,
+we intend to explore beyond the hand-craft and generic features 
+by learning effective aesthetics features from images directly. 
+%%%%%%%%% The fixed size constrain%%%%%%%%%%%%%%
+However, the originally proposed CNN architecture cannot be directly 
+applied to our task lies in the requirement of fixed input size constrain. 
+This constrain poses a particular challenge for applying a deep neural network 
+algorithm to aesthetics assessment, because the key
+of this problem is to capture both the holistic information 
+with regarding to image layout as well as 
+fine-grained high resolution details, which is different from the 
+conventional tasks of image classification and object recognition.
+To meet the fixed size restriction, input images
+need to be transformed via cropping, scaling, or padding
+before feeding into the neural network. These transformations
+often compromise the aesthetics of the original images, which
+lead to the problems of fine-grained details loosing and layout 
+distortion. 
+
+As illustrated in Figure 1, cropping can sometimes
+negatively change the image composition, such as turning
+a well-composed photo in (a) that originally follows rule of
+thirds into an ill-composed one. In addition, one randomly cropped 
+patch may will generate ambiguity in training examples as aesthetic 
+attributes in one patch may not well represent the fine-grained 
+information in the entire image. Scaling distorts the salient object 
+in (b) and padding plus uniformly scaling reduces the original image 
+resolution and compromises the detail clarity of the important object 
+as shown in (c). The artificial boundaries between the original image
+and the padding area could also possibly confuse the neural network. 
+Finally, for deep learning, assigning the aesthetics label 
+of an original image to its transformed versions during training 
+will likely make the data more ambiguous and thus compromise the 
+ability of the network to learn good discriminative features.
+
+%%%%%%% SPP and CVPR'16 solve fixed-size strategy%%%%%%%%%%%
+Existing methods address this fixed-size restriction by constructing
+adaptive spatial pooling layer to allow network to accept as input images 
+as its original size and aspect ratio \cite{SPP} \cite{cvpr:2016}.
+Theoretically, these network structure can be trained with standard
+back-propagation, regardless of the input image size. But in practice the 
+GPU implementations are preferably run on fixed input images. To implement 
+these network architectures, they simulate the varying input sizes by using 
+multiple fixed-size inputs during training, which is apparently 
+far from arbitrary size. Moreover, they still learn from 
+transformed inputs, which ignores the fine grained details of the 
+original images.
+%%%%%%%%%%%% fine-grained details %%%%%%%%%%%%%%%%%
+Such fine-grained details has been shown highly
+useful in applications such as image quality estimation 
+\cite{Kang:2014:CNN:2679600.2680212},
+image aesthetics categorization, and image style classification
+\cite{Lu:2014:ACMMM}. However, learning fine-grained details is 
+challenging, as that information locates in original, relatively 
+high resolution images. Deep convolutional neural networks are 
+often trained with inputs for color images, and training deep 
+networks with large-size input dimensions requires much longer 
+training time and a significantly larger network structure, training
+dataset, and hardware memory. To support fine grained details, 
+\cite{Lu:ICCV } propose a deep multi-patch aggregation network architecture 
+(DMA-Net) to simultaneously take multiple random cropped patches
+as input. This network shows promising results; however, these orderless
+bag of image patches cannot represent image layout, which result in the 
+heuristic information loosing. Moreover, as their cropping strategy is 
+randomized, so they sacrifice the training efficiency by randomly select 
+50 groups of patches, and consequently the training process should be 
+performed 50 times so as to maximize the input information and hence enhance 
+the accuracy.
+
+In this paper, we present an efficient Multi-Patch Layout-Aware Aggregation 
+Convolutional Neural Network (EMPLA-CNN) architecture for photo aesthetic
+assessment that can accept arbitrary image sizes, and aware 
+of both the fine-grained details as well as image layout simultaneously.
+To support our EMPLA-CNN training on heterogeneous inputs, i.e.
+fine-grained details and image layout, we extend the method by developing 
+a dedicated double-subnet neural network structure, i.e. multi-patch subnet
+and layout-aware subnet. We integrate the two subnet after some layers of 
+transformations to form the final classifier.
+
+Motivated by \cite{Lu}, we construct the Multi-Patch subnet to support fine-grained
+details learning utilizing multiple patches cropped from one original image.
+We formulate the learning problem by representing an input image with a small
+set of patches carefully cropped from it and associating the set with the image's 
+training label, and propose novel deep neural network architectures to solve 
+the problem. Instances in a set are orderless and the central idea is
+to perform aggregation of the multiple patch instances. A statistical layer leverage
+several common statistical functions is adopted to support deep multi-patch 
+aggregation network training. To enhance the training 
+efficiency, we propose an adaptive multi-patch selection strategy instead of 
+random selecting strategy. Our proposed adaptive selection strategy aims to
+maximize the efficient input information by dedicatedly selecting patches that
+play more important roles in affecting an image's aesthetics.
+Despite the fine-grained details, our EMPLA-CNN performance is enhanced by 
+simultaneously incorporating image layout though the layout-aware subnet. 
+Specifically, we represent various input images' layout by constructing an 
+attribute graph, which encodes image's local and global layout. We further 
+construct a layout-aware aggregation layer to effectively combine the predictions 
+from these subnets.
+
+Our main contributions are three-fold. We introduce novel neural network architectures to
+support learning from original images without considering the image size restriction.
+In particular, we propose two novel subnets and their aggregation strategies to support 
+fine-grained details and layout training in the same time. To enhance the training 
+efficiency, we propose an adaptive patch selection strategy, which demonstrate significant
+improvement over the state of the art. By leveraging both the holistic information 
+of the image and the extracted fine-grained details using EMPLA-Net, we further boost the 
+performance in image style classification and image cropping application.
+
+\section{Related Work}
+%%%%%% hand-craft features (low level) 
+Early methods \cite{Datta:2006:ECCV} and \cite{Ke:2006:CVPR} formulate 
+the problem  as a classification or regression problem where a given image is
+mapped to an aesthetic rating, which is normally quantized with discrete
+values. Under this framework, the following works assessing 
+aesthetics by extracting handcraft or generic visual features 
+and then employ various machine learning algorithms to predict 
+photo aesthetic values. Thus the effectiveness of the image representation,
+or the extracted features is a critical part for aesthetics assessment.
+Some existing methods manually design various hand-craft aesthetics features 
+according to photography rules and people’s aesthetics perception,
+including low-level image statistics such as distribution of edges 
+, color histograms and light contrast, etc, \cite{Luo:2008:ECCV} 
+\cite{Bhattacharya:2010:ACMMM} ,as well as some high level
+features, like composition principles (e.g. "Rule of Thirds", "Visual Balance" 
+and "Golden Ratio"), Low of Depth, dark channel, color harmony, photo content 
+and scene categories, etc. \cite{Tang:2013:TMM} \cite{Sagnik:2011:CVPR} 
+\cite{Su:2011:ACMMM} \cite{Cohen-Or:2006:SIGGRAPH}.
+
+While these handcrafted aesthetics features are often inspired 
+from the photography or psychology literature, they share some 
+known limitations. First, the aesthetics-sensitive attributes 
+are manually designed, hence have limited scope. It is possible 
+that some effective attributes have not yet been discovered 
+through this process. Second, because of the vagueness of certain 
+photographic and psychologic rules and the difficulty in implementing 
+them computationally, these handcrafted features are often merely approximations
+of such rules. There is often a lack of principled approach to improve the 
+effectiveness of such features.
+
+%%%%% generic feautres 
+Other approaches have been developed to leverage more 
+generic image features to predict photo aesthetics to 
+address the limitations of the handcrafted aesthetic features. 
+They used well-designed common image features such as SIFT, Fisher Vector 
+\cite{Marchesotti:2011:ICCV} \cite{Perronnin:2010:ECCV}  
+and bag of visual words \cite{Su:2011:ACMMM}. 
+
+%%%%% CNN method
+Recently, deep learning methods have shown great success in various 
+computer vision tasks, such as object recognition, object detection, 
+and image classification. Deep learning methods, such as deep 
+convolutional neural network has also been applied to photo quality and 
+aesthetics assessment and has shown promising results \cite{Lu:2014:ACMMM}
+\cite{Lu:2015:ICCV} \cite{Tang:2014:CVPR}. As most deep neural network 
+architectures require fixed-size inputs, recent methods transform input images
+via cropping \cite{Kang:2014:CVPR}, scaling, and padding, 
+and design dedicated deep network architectures, 
+such as multi-column networks \cite{Lu:2014:ACMMM} \cite{Lu:2015:ICCV}, 
+multi-subnet networks \cite{Mai:2016:CVPR}, and spatial pyramid pooling 
+networks\cite{Kaiming:archive:2014}. Since transformation often affect the 
+aesthetics quality of the original images as discussed in section 1, this 
+paper designs a dedicated EMPLA-Net architecture that can directly accept 
+arbitrary images with its native size and perform training and testing 
+with considering fine-grained details as well as image layout simultaneously, 
+thus preserving the quality of the original images.
+
+The design of our EMPLA-CNN network is inspired by the success of the 
+DMA-Net \cite{Lu:2015:ICCV}. Like the DMA-Net, our method also crops 
+multiple patches to preserve fine-grained details. Compared to DMA-Net, 
+our method has two main differences. First, instead of cropping patches
+randomly, we propose an adaptive patch selection strategy, which carefully
+select the most important parts within an image so as to enhance the training 
+efficiency. Seconds, unlike the DMA-Net that just take care of the fine-grained 
+details of an image, our EMPLA-CNN also considers the image layout, and accepts 
+both fine-grained details and image layout in the same time by combing two subnets.
+That allows out network to learn much more effective features of the input images, 
+which in turn improves the network performance.
+
+%-------------------------------------------------------------------------
+\section{Multi-Patch Layout-Aware Aggregation CNN}
+
+\begin{figure}
+	\centering
+	\includegraphics[scale=0.43]{figures/img_transform}
+	\label{transform}
+\end{figure}
+
+The architecture of our proposed EMPLA-CNN, which consists of a multi-patch subnet 
+and a layout-aware subnet, is illustrated in \ref{transform}. Given an arbitrary sized 
+image, we will carefully select multiple patches feed into the multi-patch
+subnet. The selection is performed by our proposed adaptive patch selection strategy, which
+is capable of maximizing the most efficient information within an input image. A statistic 
+aggregation layer is followed to combine the multiple patches' deep feature together.
+At the same time, a trained CNN is adopted to detect objects in the image. The local 
+and global layout of the input image are further represented by an attribute-graph. 
+At the end, a learned aggregation layer is utilized to effectively incorporate different 
+sources of deep features from the two subnets and finally give the aesthetic prediction. 
+More details of the proposed Multi-Patch subnet and the Layout-Aware subnet will be 
+illustrated in next sections. 
+
+\subsection{Multi-Patch subnet}
+To support multi-patch training, we represent each image with a set of patches, 
+and associate the set with the image's label.
+The training data become ${{\rm{\{ }}{{\rm{P}}_n}{\rm{, }}{{\rm{y}}_n}{\rm{\} }}_{n \in [1,N]}}$ 
+where ${P_n} = {\{ {p_{nm}}\} _{m \in [1,M]}}$ is the set of $M$ patches cropped from each image. 
+As shown in Fig.\ref{multi_patch}, the Multi-Patch subnet contains mainly three parts: an adaptive 
+patch selection module, a set of parallel CNNs which extract deep features from multiple 
+each of the patch, and an orderless aggregation structure which combines 
+extracted deep features from the multi-column CNNs jointly.
+
+\begin{figure}
+	\centering
+	\includegraphics[scale=0.26]{figures/whole_net.jpg}
+	\label{whole_net}
+\end{figure}
+
+\subsubsection{Adaptive Patch Selection}
+Instead of randomly crop 50 sets of patches \cite{Lu:2015:ICCV}, 
+our adaptive patch selection aims to carefully crop as few as 
+sets of patches while representing as much as efficient information 
+that affecting photo aesthetics.To realize that, we studied professional 
+photography rules and human visual principles. 
+We find that human visual attention is not distributed evenly within an image, 
+which means that, some regions dominate the effects when people valuating
+photos, while the others do not. In addition, holistic analysis is critical 
+for evaluating an image with regarding to its aesthetics, which means that 
+just focus on the subjects is not enough for aesthetic assessment.
+Inspired by these concerns, we considering the following issues to 
+guide us selecting patches.
+
+%It has been investigated that, an image's subject matter is one of the most 
+%distinguish factors between professional photos and snapshots \cite{Ke:2006:CVPR}.
+The task of saliency detection is to identify the most important and informative 
+part of a scene. Saliency map models human visual distribution,
+and is capable of highlighting visually attention region, i.e. the region which
+occupies higher saliency value. Therefore, it is natural to adopt saliency map
+to select more important regions.
+
+\begin{figure}
+	\centering
+	\includegraphics[scale=0.3]{figures/pattern.jpg}
+	\label{pattern}
+\end{figure}
+
+Despite selecting the most salient regions within an image, we also 
+encourage the diversity within a set of patches. 
+The conventional tasks, like image classification and object 
+recognition, always just focus on the foreground objects, and the background 
+is ignored. However, as mentioned before, to assess aesthetics, just consider 
+the foreground objects is not enough. Because some important global aesthetic 
+properties, e.g. Low-of-Depth, color harmonization, simplicity, etc., 
+are all perceived by analyzing an image as a whole. 
+As wen can see from fig. \ref{pattern}, the foreground objects 
+(bottle, candy and plate) and the background (wallpaper) are all 
+show in different patterns. Such different patterns represent the 
+most distinguish parts within an image, which are critical clues
+for us to detect these global aesthetic properties. Thus we encourage
+the patches pattern diversity to support our network is capable of not 
+only learn from the subjects regions, but also the global aesthetic properties.
+
+To constrain the overlapping ratio of these selected patches. 
+Spatial distance for each of the patch is also considered. 
+
+\begin{figure*}
+	\centering
+	\includegraphics[scale=0.45]{figures/multi_patch_subnet.jpg}
+	\label{multi_patch}
+\end{figure*}
+
+Based on the above consideration, we formulate the patch selection as an 
+optimization problem.  An objective function is defined to select the 
+optimal combination of patches which contain maximum aesthetic-efficient 
+information:
+
+\[\{ {c^ * }\}  = \mathop {argmax}\limits_{i,j \in [1,M]} \left[ {\sum\limits_{i = 1}^M {{S_i}}  + \sum\limits_{i \ne j}^M {{D_p}({{\widetilde {\rm N}}_i},{{\widetilde {\rm N}}_j}) + \sum\limits_{i \ne j}^M {{D_s}({c_i},{c_j})} } } \right]\]
+where $\{ {c^ * }\} $ is the optimal subset of selected patch centers. $\;{S_i} = \frac{{sal({p_i})}}{{area({p_i})}}$ is the normalized saliency value that 
+each patch occupies. ${D_p}( \cdot )$ is the pattern distance function which 
+measures the difference of two patches' patterns. Here we we utilize 
+edge distribution to represent the pattern of each patch, ${{\tilde N}_i}$ 
+is the edge distribution for patch $p_i$. The difference is measured by the 
+Earth Mover's Distance (EMD). ${D_s}( \cdot )$ is the spatial distance function, which is measured by Euclidean Distance.
+
+
+
+\subsubsection{Orderless Aggregation Structure}
+The central idea of the orderless aggregation structure is to perform 
+aggregation of the multiple instances to support our network learn from multiple 
+patches cropped from one image.
+Let ${\left\langle {{\rm{Blo}}{{\rm{b}}_n}} \right\rangle _{l}} = \{ b_i^n\} _{i \in [1,M]}^{l}$ be the set of patch features extracted from $n_{th}$ image 
+at $l_{th}$ layer of the shared CNNs. Where $b_i^n$ is a $K$ dimensional vector.
+For simplicity, we will omit the index $n$ in the following. 
+Denote by $T_k$ the set of values
+of the $k_{th}$ component of all ${b_i} \in Blob$, i.e. ${T_k} = {\{ {d_{ik}}\} _{i \in [1,M]}}$.
+
+The orderless aggregation layer is comprised of a collection of statistical functions, 
+i.e., ${F_{Agg}} = {\{ F_{Agg}^u\} _{u \in [1,U]}}$. Each $F_{Agg}^u$ computes
+$Blob$ returned by the shared CNNs. In our work, we propose to have $U = \{ max,\;mean\} $. 
+The outputs of the functions in $U$ are concatenated to produce a ${K_{stat}}$-dimensional feature vectors. Two fully connected layers are followed for implementing of multi-patch
+aggregation component. The whole structure can be expressed as a function 
+$f:\{ Blob\}  \to {{{K_{stat}}}}$:
+\[f(Blob) = W \times ( \oplus _{u = 1}^U \oplus _{k = 1}^KF_{Agg}^u({T_k}))\]
+where $ \oplus$ is a vector concatenation operator which produces a column vector, $W \in {^{{K_{stat}} \times UK}}$ is the parameters of the fully-connected layer. 
+The figure shows an example of Statistics Aggregation Structure with $M = 5$ and $K=3$. In practice, the feature
+dimension $K=4096$.
+
+\subsection{Layout-Aware Subnet}
+The layout of an image is another critical ingredient that
+affecting aesthetics. Good and balanced composition could make an 
+image look more appealing even if the scene being shot is normal. 
+In photography, widely accepted principles such as rule of thirds, 
+leading lines, visual balance are all useful composition techniques 
+for creating better photos. 
+By utilizing the Multi-Patch subnet, we can preserve the fine-grained 
+details, while the layout of objects within an image is ignored. 
+This problem has not been solved by existing multi-patch-based methods. 
+To compensate the problem of layout information absence, we develop
+a novel Layout-aware subnet, and combine it with the Multi-Patch subnet 
+to effectively enhance the performance of our proposed EMPLA-CNN.
+
+In this paper, we develop an Attribute-Graph model, which using graph 
+nodes to represent objects and global context of the scene. Each object is 
+described using object-specific local attributes, and the overall 
+scene with global attributes, thereby capturing both local and global 
+descriptions of the image. Apart from this, our model also incorporates 
+the geometrical layout of the objects in the image. The edges of the 
+graph capture the location, interaction and orientation of the nodes 
+with respect to other nodes. The proposed Attribute-Graphs thus characterize
+an image from three different perspectives, namely, 
+global (scenes), local (objects) as well as the inter-relation. 
+This allows them to better conceptualize the essence of the image.
+
+\subsubsection{Attribute Graph Construction}
+We first employ a trained CNN to localize and classify objects. Each 
+object is labeled by a bounding box. The Attribute-Graph, which is an 
+undirected fully connected graph, incorporating both local and global 
+image characteristics. As can be seen from \ref{layout},
+the graph nodes characterise objects as well as the overall scene context using 
+node attributes,  while the edges capture the object topology. 
+
+We propose to use undirected fully connected graph $G(V,E)$ to represent images.
+Here, $V = \{ {V_{local}},{V_{global}}\}$ represent the nodes and $E$ represents the set of edges connecting the nodes. Each object present in the image contributes to a graph node resulting in a total of $N_{obj}$ object nodes or we call local nodes by ${V_{local}} = \{ {v_1}, \cdot  \cdot  \cdot ,{v_{{N_{obj}}}}\} $. The additional node $V_{global}$ (also referred to as the global node) represents the background or the overall scene. An image with $N_{obj}$ objects is thus transformed into a graph having $N_{obj}+1$ nodes. We define two kind of edges, i.e. local edges and global edges. Where local edges refer to the edges between two object nodes, there will be $({N_{obj}} - 1)!$ such edges. The edges connecting object nodes and global node are global edges, there will be $N_{obj}$ such edges.
+
+Each object node is represented using object level attributes (local attributes). These local attributes are limited to the area occupied by the bounding box of that particular object. The global node captures the overall essence of the image. We use a different set of attributes, which we refer to as global attributes to define this node. These attributes are extracted 
+from the entire image(I) and describe the image as a whole. This enables the global node represent the image context or scene characteristics effectively.
+The features of the model are defined so as to capture the spatial configuration of the image components. The local features capture the relative arrangement of the objects with respect to each other while the global
+features define the positioning of the objects in the image. The features are represented by 
+\[f({e_{ij}}) = \left\{ {\begin{array}{*{20}{c}}
+	{[{\mu _{ij}},\;{\theta _{ij}},\;{o_{ij}}]\;\;\;\;\;\;\;\;\;if\;{v_i},{v_j} \in {V_l}}\\
+	{[{\mu _{ig}},\;{\theta _{ig}},\;area({v_i})]\;\;\;\;\;if\;{v_i} \in {V_l}\;\& {v_j} = {V_g}}
+	\end{array}} \right.\]
+$e_{ij}$ represents the edge connecting node $v_i$ to node $v_j$. $\mu_{ij}$ is the spatial distance between object centroids. $\theta_{ij}$ represents the angle of the graph edge with respect to the horizontal taken in the anti-clockwise direction, while ensuring left/right symmetry. It indicates the relative spatial organization of the two objects. Left/right symmetry is ensured by considering an angle $\theta$ to be equal to the angle $(180-\theta)$. $o_{ij}$ represents the amount of overlap between the bounding boxes of the two objects and is given by 
+\[{o_{ij}} = \frac{{area({v_i}) \cap area({v_j})}}{{\min (area({v_i}),area({v_j}))}}\]
+${area({v_i})}$ is the fraction of the image area occupied by the ${i^{th}}$ bounding box.
+The intersection of the two bounding boxes is normalized by the smaller of the bounding boxes to ensure the overlap score of one, when a smaller object is inside a larger one. Inclusion of $area({v_i})$ as a global edge feature causes the net consideration of the nodes of similar sizes to each other.
+
+$\mu_{ig}$ and $\theta_{ig}$ are the magnitude and orientation of the edge connecting the centroid of the object corresponding to node $v_i$ to the global centroid. The global centroid is computed as given 
+\[{c_g} = \frac{1}{N}\sum\limits_{k = 1}^N {{c_k}} \]
+$c_k$ represents the centroid of the $k^{th}$ local node. The global centroid represents the center of the geometrical layout of the objects in the image. The edges connecting each object to the global node illustrate the placement of that object with respect to the overall object topology.
+
+
+
+\begin{figure*}
+	\centering
+	\includegraphics[scale=0.5]{figures/layout_graph.jpg}
+	\label{layout}
+\end{figure*}
+
+%\subsubsection{Spatial Pyramid Aggregation Structure}
+%Based on the above consideration, to satisfy the fixed length request and to generate comparable
+%feature vector in order to combine with the Multi-patch subnet are two critical 
+%issues need to be resolved. To address these problems, we propose a novel spatial pyramid 
+%aggregation structure which represents an arbitrary image layout hierarchically. The features
+%at each level of the spatial pyramid are concatenated into a fixed length 1D feature vector.
+%
+%For each image, we adopt a fixed size of objects quantities, notate as $N_{obj}^ * $.
+%The equation to generate the feature vector is given by:
+%\[f =  \oplus _{m = 1}^{N_{obj}^ * } \oplus _{k = 1}^K{\bf{{\rm M}}}(\{ v\} _m^k)\]
+%where ${\bf{{\rm M}}}({\{ v\} _m}) \in {^{(m + 1)*(m + 1)}}$ is the function which construct the 
+%Attribute-Graph. Thus we will obtain a $\sum\nolimits_{i = 2}^{N_{obj}^ *  + 1} {{i^2}*K} $ feature vector for any specific image.
+
+%To effectively incorporate the two subnetworks together, we use a new aggregation layer that
+%takes the concatenation of the sub-networks as input and output the aesthetics prediction.
+%Figure 5 shows our whole network that implements the layout-aware aggregation component
+%using a fully-connected layer with ** neurons.
+%Conceptually the scene-aware aggregation layer can be
+%trained end-to-end along with the sub-networks. In our implementation,
+%we simplify the computational complexity in
+%both training and testing by first training the MNA-CNN
+%sub-networks and then training the aggregation on the validation
+%data with the sub-networks fixed.
+
+%\section{Broader Impacts of the Proposed Work}
+%In conclusion, major innovations in the proposed research include:
+%
+%$\bullet$ A powerful trained network for photo recommendation, which assist users
+%to take professional like photos
+%
+%$\bullet$ Construct a new Deep ConvNet architecture, which eliminate the input image
+%size constrain, and incorporate layout information
+%
+%$\bullet$ Adopt a adaptive patch selection strategy, which is capable of representing
+%original fine-grained image information as much as possible while just using a few
+%number of patches to enhance the training efficiency.
+%
+%Once successfully developed, it is expected that future digital camera users or 
+%even mobile device users shall be able to take professional like photos easily.
+%More importantly, the network we designed can also used for image aesthetic 
+%assessment, and further applied to image retrieval, image ranking, etc. This research 
+%can lend insights into how to incorporate heterogeneous source information together, 
+%which may lead to multiple instance learning research.
+
+ 
+
+%-------------------------------------------------------------------------
+
+
+
+An example of a bad paper just asking to be rejected:
+\begin{quote}
+\begin{center}
+    An analysis of the frobnicatable foo filter.
+\end{center}
+
+   In this paper we present a performance analysis of our
+   previous paper [1], and show it to be inferior to all
+   previously known methods.  Why the previous paper was
+   accepted without this analysis is beyond me.
+
+   [1] Removed for blind review
+\end{quote}
+
+
+An example of an acceptable paper:
+
+\begin{quote}
+\begin{center}
+     An analysis of the frobnicatable foo filter.
+\end{center}
+
+   In this paper we present a performance analysis of the
+   paper of Smith \etal [1], and show it to be inferior to
+   all previously known methods.  Why the previous paper
+   was accepted without this analysis is beyond me.
+
+   [1] Smith, L and Jones, C. ``The frobnicatable foo
+   filter, a fundamental contribution to human knowledge''.
+   Nature 381(12), 1-213.
+\end{quote}
+
+If you are making a submission to another conference at the same time,
+which covers similar or overlapping material, you may need to refer to that
+submission in order to explain the differences, just as you would if you
+had previously published related work.  In such cases, include the
+anonymized parallel submission~\cite{Authors14} as additional material and
+cite it as
+\begin{quote}
+[1] Authors. ``The frobnicatable foo filter'', F\&G 2014 Submission ID 324,
+Supplied as additional material {\tt fg324.pdf}.
+\end{quote}
+
+write the following:
+\begin{quotation}
+\noindent
+   We describe a system for zero-g frobnication.  This
+   system is new because it handles the following cases:
+   A, B.  Previous systems [Zeus et al. 1968] didn't
+   handle case B properly.  Ours handles it by including
+   a foo term in the bar integral.
+
+   ...
+
+   The proposed system was integrated with the Apollo
+   lunar lander, and went all the way to the moon, don't
+   you know.  It displayed the following behaviours
+   which show how well we solved cases A and B: ...
+\end{quotation}
+As you can see, the above text follows standard scientific convention,
+reads better than the first version, and does not explicitly name you as
+the authors.  A reviewer might think it likely that the new paper was
+written by Zeus \etal, but cannot make any decision based on that guess.
+He or she would have to be sure that no other authors could have been
+contracted to solve problem B.
+
+FAQ: Are acknowledgements OK?  No.  Leave them for the final copy.
+
+
+\begin{figure}[t]
+\begin{center}
+\fbox{\rule{0pt}{2in} \rule{0.9\linewidth}{0pt}}
+   %\includegraphics[width=0.8\linewidth]{egfigure.eps}
+\end{center}
+   \caption{Example of caption.  It is set in Roman so that mathematics
+   (always set in Roman: $B \sin A = A \sin B$) may be included without an
+   ugly clash.}
+\label{fig:long}
+\label{fig:onecol}
+\end{figure}
+
+\subsection{Miscellaneous}
+
+\noindent
+Compare the following:\\
+\begin{tabular}{ll}
+ \verb'$conf_a$' &  $conf_a$ \\
+ \verb'$\mathit{conf}_a$' & $\mathit{conf}_a$
+\end{tabular}\\
+See The \TeX book, p165.
+
+The space after \eg, meaning ``for example'', should not be a
+sentence-ending space. So \eg is correct, {\em e.g.} is not.  The provided
+\verb'\eg' macro takes care of this.
+
+When citing a multi-author paper, you may save space by using ``et alia'',
+shortened to ``\etal'' (not ``{\em et.\ al.}'' as ``{\em et}'' is a complete word.)
+However, use it only when there are three or more authors.  Thus, the
+following is correct: ``
+   Frobnication has been trendy lately.
+   It was introduced by Alpher~\cite{Alpher02}, and subsequently developed by
+   Alpher and Fotheringham-Smythe~\cite{Alpher03}, and Alpher \etal~\cite{Alpher04}.''
+
+This is incorrect: ``... subsequently developed by Alpher \etal~\cite{Alpher03} ...''
+because reference~\cite{Alpher03} has just two authors.  If you use the
+\verb'\etal' macro provided, then you need not worry about double periods
+when used at the end of a sentence as in Alpher \etal.
+
+For this citation style, keep multiple citations in numerical (not
+chronological) order, so prefer \cite{Alpher03,Alpher02,Authors14} to
+\cite{Alpher02,Alpher03,Authors14}.
+
+
+\begin{figure*}
+\begin{center}
+\fbox{\rule{0pt}{2in} \rule{.9\linewidth}{0pt}}
+\end{center}
+   \caption{Example of a short caption, which should be centered.}
+\label{fig:short}
+\end{figure*}
+
+%------------------------------------------------------------------------
+\section{Formatting your paper}
+
+All text must be in a two-column format. The total allowable width of the
+text area is $6\frac78$ inches (17.5 cm) wide by $8\frac78$ inches (22.54
+cm) high. Columns are to be $3\frac14$ inches (8.25 cm) wide, with a
+$\frac{5}{16}$ inch (0.8 cm) space between them. The main title (on the
+first page) should begin 1.0 inch (2.54 cm) from the top edge of the
+page. The second and following pages should begin 1.0 inch (2.54 cm) from
+the top edge. On all pages, the bottom margin should be 1-1/8 inches (2.86
+cm) from the bottom edge of the page for $8.5 \times 11$-inch paper; for A4
+paper, approximately 1-5/8 inches (4.13 cm) from the bottom edge of the
+page.
+
+%-------------------------------------------------------------------------
+\subsection{Margins and page numbering}
+
+All printed material, including text, illustrations, and charts, must be kept
+within a print area 6-7/8 inches (17.5 cm) wide by 8-7/8 inches (22.54 cm)
+high.
+
+
+
+%-------------------------------------------------------------------------
+
+
+%-------------------------------------------------------------------------
+\subsection{Footnotes}
+
+Please use footnotes\footnote {This is what a footnote looks like.  It
+often distracts the reader from the main flow of the argument.} sparingly.
+Indeed, try to avoid footnotes altogether and include necessary peripheral
+observations in
+the text (within parentheses, if you prefer, as in this sentence).  If you
+wish to use a footnote, place it at the bottom of the column on the page on
+which it is referenced. Use Times 8-point type, single-spaced.
+
+%-------------------------------------------------------------------------
+\subsection{References}
+
+{\small
+	\bibliographystyle{IEEE}
+	\bibliography{test}
+}
+
+
+%\bibliographystyle{IEEE}
+%\bibliography{test.bib}
+
+\begin{table}
+\begin{center}
+\begin{tabular}{|l|c|}
+\hline
+Method & Frobnability \\
+\hline\hline
+Theirs & Frumpy \\
+Yours & Frobbly \\
+Ours & Makes one's heart Frob\\
+\hline
+\end{tabular}
+\end{center}
+\caption{Results.   Ours is better.}
+\end{table}
+
+%-------------------------------------------------------------------------
+\subsection{Illustrations, graphs, and photographs}
+
+When placing figures in \LaTeX, it's almost always best to use
+\verb+\includegraphics+, and to specify the  figure width as a multiple of
+the line width as in the example below
+{\small\begin{verbatim}
+   \usepackage[dvips]{graphicx} ...
+   \includegraphics[width=0.8\linewidth]
+                   {myfile.eps}
+\end{verbatim}
+}
+
+
+%-------------------------------------------------------------------------
+\subsection{Color}
+
+Please refer to the author guidelines on the CVPR 2016 web page for a discussion
+of the use of color in your document.
+
+%------------------------------------------------------------------------
+\section{Final copy}
+
+You must include your signed IEEE copyright release form when you submit
+your finished paper. We MUST have this form before your paper can be
+published in the proceedings.
+
+Please direct any questions to the production editor in charge of these
+proceedings at the IEEE Computer Society Press: Phone (714) 821-8380, or
+Fax (714) 761-1784.
+
+{\small
+\bibliographystyle{ieee}
+\bibliography{egbib}
+}
+
+\end{document}
